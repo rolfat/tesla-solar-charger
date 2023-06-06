@@ -205,12 +205,12 @@ def fetch_solar_data():
   return new_solar_data
 
 
+vue.init()
 while True:
-  QUERY_FREQUENCY_SECONDS = (60 * 20)
+  QUERY_FREQUENCY_SECONDS = 60
   try:
     starttime = time.time()
     print("Begin: %s" % time_to_string(starttime))
-
     vue.fetch_solar_data()
 
     # if fetch_solar_data() and tesla.fetch_vehicle_data(tesla_email):
@@ -220,13 +220,7 @@ while True:
 
     # update_state()
 
-    # sleeptime = (lastoutts + QUERY_FREQUENCY_SECONDS) - time.time()
-    # if sleeptime <= 0:
-    #   sleeptime = 60
-    # print("Waking in %im%is at %s \n" %
-    #       ((sleeptime / 60),
-    #        (sleeptime % 60), time_to_string(starttime + sleeptime)))
-    # time.sleep(sleeptime)
+    time.sleep(QUERY_FREQUENCY_SECONDS)
   except Exception as e:
     print(e)
     time.sleep(120)
