@@ -6,6 +6,15 @@
 # This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
 # You should have received a copy of the GNU General Public License along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+# Reads from Enphase Solar Panel controller via Enphase API
+# to get current electricity production and then sets the charging
+# amperage of the Tesla via the Tesla API to match the production.
+# The code rounds up so a little electricity is taken off the grid,
+# maximizing the usage of solar and minimizing the amount fed back to the grid.
+# As the resolution of enphase seems to be every 15 minutes, with a 5 minute
+# delay, its not perfect, but gets pretty close.
+
+import requests
 import tesla
 import vue
 import math
@@ -33,26 +42,6 @@ CHARGE_LIMIT_NONOPERATING = 55
 
 
 # amps * volts = watts
-def maybe_adjust_charger(solar_usage):
-
-  # maybe_set_night_charging_config()
-  print('ereh')
-
-  vue.print_solar_usage()
-
-  if not has_new_data(solar_usage):
-    print("no new data, not updating charger")
-    return
-
-  print("Spare Watts:", sparewatts)
-  for vehicle in tesla.vehicles:
-    setcar(vehicle)
-
-
-def has_new_data(solar_usage):
-  return False
-
-
 def setcar(vehicle):
 
   global sparewatts, lastvehiclechange_ts, lastoutts, lastin
@@ -119,6 +108,28 @@ last_is_operating = False
 last_is_at_home = False
 
 
+def processmatch():
+  global sparewatts, lastin, lastints, lastout, lastoutts
+
+  maybe_set_night_charging_config()
+
+  print("Consumed: %i watts collected %i seconds ago." %
+        (lastout, time.time() - lastoutts))
+  print("Produced: %i watts collected %i seconds ago." %
+        (lastin, time.time() - lastints))
+
+  sparewatts = lastin - lastout
+  print("Spare Watts:", sparewatts)
+  if lastoutts > lastvehiclechange_ts:
+    for vehicle in tesla.vehicles:
+      setcar(vehicle)
+  else:
+    print(
+      "Ignoring as last consumed data is older than last vehicle charge update."
+    )
+  return
+
+
 def time_to_string(timestamp):
   DATETIME_FORMAT = "%d %b %Y, %H:%M:%S"
 
@@ -161,18 +172,52 @@ def update_state():
   last_is_at_home = tesla.vehicle_is_at_location(home_lat, home_long)
 
 
+def fetch_solar_data():
+  INTERVALS_PER_HOUR = 4
+  global sparewatts, lastin, lastints, lastout, lastoutts
+
+  fetch_vue_data()
+  url = "https://api.enphaseenergy.com/api/v2/systems/%s/consumption_stats?%s" % (
+    system_id, auth)
+  r = requests.get(url).json()
+
+  new_solar_data = False
+  now_out = r['intervals'][-1]['enwh'] * INTERVALS_PER_HOUR
+  now_out_ts = r['intervals'][-1]['end_at']
+  if now_out_ts > lastoutts or now_out != lastout:
+    lastout = now_out
+    lastoutts = now_out_ts
+    new_solar_data = True
+
+  url = "https://api.enphaseenergy.com/api/v2/systems/%s/summary?%s" % (
+    system_id, auth)
+  r = requests.get(url).json()
+  try:
+    now_in = r['current_power']
+    now_in_ts = r['last_interval_end_at']
+    if (now_in_ts > lastints or now_in != lastin):
+      lastin = now_in
+      lastints = now_in_ts
+      new_solar_data = True
+  except:
+    pass
+
+  return new_solar_data
+
+
 vue.init()
 while True:
   QUERY_FREQUENCY_SECONDS = 60
   try:
     starttime = time.time()
     print("\nBegin: %s" % time_to_string(starttime))
-    solar_usage = vue.fetch_solar_data()
-    # tesla.fetch_vehicle_data(tesla_email)
 
-    maybe_adjust_charger(solar_usage)
+    if fetch_solar_data() and tesla.fetch_vehicle_data(tesla_email):
+      processmatch()
+    else:
+      print("No new data, sleeping...")
 
-    # update_state()
+    update_state()
 
     time.sleep(QUERY_FREQUENCY_SECONDS)
   except Exception as e:
