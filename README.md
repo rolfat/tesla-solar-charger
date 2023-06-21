@@ -12,7 +12,6 @@ You'll need to generate enphase API keys at https://developer.enphase.com/.
 Edit the environment variables to put in your tesla account email address, home latitude and longitude (make sure to use negative longitude for western hemisphere), and the systemid and number of reporting devices (panels) in your enphase array. Then run main.py. It will fetch current status, set the Tesla charging appropriately, and then sleep for 15 minutes to repeat.
 
 # Feature requests
-- swap out enphase for vue
 - use scheduler instead of `sleep()`
 - account for tiered electricity rates
 - support multiple vehicles & tenants

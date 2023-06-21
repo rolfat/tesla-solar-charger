@@ -8,7 +8,6 @@
 
 import tesla
 import vue
-import math
 import time
 import pytz
 import os
@@ -23,35 +22,35 @@ system_id = os.getenv("systemid")
 auth = "key=%s&user_id=%s" % (api_key, user_id)
 timezone = pytz.timezone('US/Pacific')
 
-MAX_CHARGER_CURRENT = 40
-AMP_TARGET_BUDGET = 1.1
+last_is_operating = False
+last_is_at_home = False
 
-CHARGE_LIMIT_OPERATING = 70
-CHARGE_LIMIT_NONOPERATING = 55
+# CHARGE_LIMIT = 70
 
 
-# amps * volts = watts
 def maybe_adjust_charger(solar_usage):
 
   # maybe_set_night_charging_config()
 
-  if not has_new_data(solar_usage):
-    print("no new data, not updating charger")
-    return
-
+  # vue.print_solar_usage()
   spare_watts = vue.get_solar_usage('1H')
-  print("Spare Watts:", spare_watts)
+  # print("Spare Watts:", spare_watts)
   for vehicle in tesla.vehicles:
-    if should_adjust_charger(vehicle):
+    if should_adjust_charger():
       tesla.adjust_charger_by(spare_watts)
 
 
-def should_adjust_charger(vehicle):
+def should_adjust_charger():
   vd = tesla.vd_default()
   name = vd["display_name"]
-  # if not tesla.vehicle_is_plugged_in():
-  #   print("%s: Ignoring as not plugged in" % (name))
-  #   return False
+
+  if not has_new_solar_data():
+    print("no new data, not updating charger")
+    return False
+
+  if not tesla.vehicle_is_plugged_in():
+    print("%s: Ignoring as not plugged in" % (name))
+    return False
 
   if not tesla.vehicle_is_at_location(home_lat, home_long):
     print("%s: Ignoring as not at home" % (name))
@@ -61,35 +60,20 @@ def should_adjust_charger(vehicle):
     print("%s: Ignoring as outside operating hours" % (name))
     return False
 
-  if (tesla.battery_level() >= CHARGE_LIMIT_OPERATING):
-    print("%s: battery at desired charge level" % (name))
-    return False
+  # if (tesla.battery_level() >= CHARGE_LIMIT):
+  #   print("%s: battery at desired charge level" % (name))
+  #   return False
 
   return True
 
 
-def has_new_data(solar_usage):
+def has_new_solar_data():
   last_data_at = vue.usage_timestamp()
   now = datetime.fromtimestamp(time.time(), timezone)
 
   seconds_since_last_data = ((now - last_data_at).seconds)
   has_new_data = seconds_since_last_data < QUERY_FREQUENCY_SECONDS
   return has_new_data
-
-
-
-def set_nonsolar_charge_config(vehicle):
-  vehicle.command('CHARGING_AMPS', charging_amps=MAX_CHARGER_CURRENT)
-
-
-lastints = 0
-lastin = 0
-lastout = 1000000
-lastoutts = 0
-lastvehiclechange_ts = 0
-
-last_is_operating = False
-last_is_at_home = False
 
 
 def time_to_string(timestamp):
@@ -111,8 +95,7 @@ def maybe_set_night_charging_config():
 
   if should_set_config:
     print('setting nighttime config')
-    for vehicle in tesla.vehicles:
-      set_nonsolar_charge_config(vehicle)
+    tesla.set_nonsolar_charge_config()
 
 
 def did_exit_operating_hours():
@@ -134,18 +117,17 @@ def update_state():
   last_is_at_home = tesla.vehicle_is_at_location(home_lat, home_long)
 
 
+vue.init()
 while True:
   QUERY_FREQUENCY_SECONDS = 60 * 15
   try:
     starttime = time.time()
     print("\nBegin: %s" % time_to_string(starttime))
-    vue.init()
     solar_usage = vue.fetch_solar_data()
     tesla.fetch_vehicle_data(tesla_email)
 
     maybe_adjust_charger(solar_usage)
-
-    # update_state()
+    update_state()
 
     time.sleep(QUERY_FREQUENCY_SECONDS)
   except Exception as e:

@@ -1,12 +1,16 @@
 import teslapy
 import json
+import math
 # import traceback
 from replit import db
 
 LAT_LONG_THRESHOLD = .01
 DB_AUTH_KEY = 'tesla_auth'
+
 MIN_CHARGER_VOLTAGE = 220
 MIN_CHARGER_CURRENT = 0
+MAX_CHARGER_CURRENT = 40
+AMP_TARGET_BUDGET = 1
 
 vehicle_data = {}
 vehicles = []
@@ -53,9 +57,46 @@ def get_vehicles():
   return vehicles
 
 
-def adjust_charger_by(watts):
-  print('adjusting charger by', watts, 'kwh')
+def get_vehicle():
+  for vehicle in vehicles:
+    return vehicle
+
+
+def adjust_charger_by(watts_consuming_now):
+  print('adjusting charger by', watts_consuming_now, 'kwh')
   print_charger_status()
+  vd = vd_default()
+
+  charger_current = vd["charge_state"]["charger_actual_current"]
+  charger_voltage = vd["charge_state"]["charger_voltage"]
+  target_amps = calculate_target_amps(watts_consuming_now, charger_current,
+                                      charger_voltage)
+
+  if (target_amps != charger_current):
+    print("Setting charging amps to %i" % (target_amps))
+    # get_vehicle().command('CHARGING_AMPS', charging_amps=target_amps)
+
+  if vd["charge_state"]["charging_state"] != "Charging":
+    print("Start charging")
+    # get_vehicle().command('START_CHARGE')
+
+
+def calculate_target_amps(watts_consuming_now, charger_current,
+                          charger_voltage):
+  charger_watts = charger_current * charger_voltage
+  target_watts = charger_watts - watts_consuming_now
+  print('target_watts', target_watts)
+
+  target_amps = math.ceil(target_watts / charger_voltage)
+  target_amps = target_amps * AMP_TARGET_BUDGET
+  target_amps = min(target_amps, MAX_CHARGER_CURRENT)
+  target_amps = max(target_amps, MIN_CHARGER_CURRENT)
+  return target_amps
+
+
+def set_nonsolar_charge_config():
+  for vehicle in vehicles:
+    vehicle.command('CHARGING_AMPS', charging_amps=MAX_CHARGER_CURRENT)
 
 
 def print_charger_status(vd=None):
@@ -63,8 +104,8 @@ def print_charger_status(vd=None):
   charger_current = vd["charge_state"]["charger_actual_current"]
   charger_voltage = vd["charge_state"]["charger_voltage"]
   charger_watts = charger_current * charger_voltage
-  print("Currently using %i amps, %i volts, %i watts" %
-        (charger_current, charger_voltage, charger_watts))
+  print("Currently using %i amps, %i volts, %i watts at %i %% battery" %
+        (charger_current, charger_voltage, charger_watts, battery_level()))
 
 
 def get_vehicle_data(vehicle):
@@ -114,22 +155,7 @@ def db_init(key):
 
 # DEAD CODE
 def setcar(vehicle):
-  if 1 > 0:
-    amptarget = math.ceil(freewatts / charger_voltage)
-    amptarget = amptarget * AMP_TARGET_BUDGET
-    amptarget = min(amptarget, MAX_CHARGER_CURRENT)
-    amptarget = max(amptarget, MIN_CHARGER_CURRENT)
-
-    print("Setting charging amps to %i" % (amptarget))
-    vehicle.command('CHARGING_AMPS', charging_amps=amptarget)
-    sparewatts = freewatts - (amptarget * charger_voltage)
-    lastvehiclechange_ts = lastoutts
-    if vd["charge_state"]["charging_state"] != "Charging":
-      print("%s: Start charging" % name)
-      vehicle.command('START_CHARGE')
-  elif vd["charge_state"]["charging_state"] not in ("Stopped", "Complete"):
-    sparewatts = freewatts
+  if vd["charge_state"]["charging_state"] not in ("Stopped", "Complete"):
     print("%s: Stop charging" % name)
     vehicle.command('STOP_CHARGE')
     set_nonsolar_charge_config(vehicle)
-    lastvehiclechange_ts = lastoutts
