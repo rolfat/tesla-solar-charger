@@ -30,7 +30,7 @@ last_is_at_home = False
 
 def maybe_adjust_charger(solar_usage):
 
-  # maybe_set_night_charging_config()
+  maybe_set_night_charging_config()
 
   # vue.print_solar_usage()
   spare_watts = vue.get_solar_usage('1H')
@@ -104,7 +104,7 @@ def did_exit_operating_hours():
 
 def is_within_operating_hours():
   OPERATING_HOURS_START = 7
-  OPERATING_HOURS_END = 17
+  OPERATING_HOURS_END = 18
   operating_hours = range(OPERATING_HOURS_START, OPERATING_HOURS_END)
 
   current_time = datetime.fromtimestamp(time.time(), timezone)

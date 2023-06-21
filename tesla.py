@@ -71,11 +71,14 @@ def charging_beyond_limit():
   return (battery_level() >= charge_limit())
 
 
-def stop_charging():
+def is_charging():
   vd = vd_default()
+  return vd["charge_state"]["charging_state"] not in ("Stopped", "Complete")
 
-  print(": Stop charging")
-  if vd["charge_state"]["charging_state"] not in ("Stopped", "Complete"):
+
+def stop_charging():
+  if is_charging():
+    print(": Stop charging")
     get_vehicle().command('STOP_CHARGE')
     set_nonsolar_charge_config()
 
@@ -83,12 +86,13 @@ def stop_charging():
 def adjust_charger_by(watts_consuming_now):
   if (charging_beyond_limit()):
     stop_charging()
+    print("all charged up")
     return
 
   print('adjusting charger by', watts_consuming_now, 'kwh')
   print_charger_status()
-  vd = vd_default()
 
+  vd = vd_default()
   charger_current = vd["charge_state"]["charger_actual_current"]
   charger_voltage = vd["charge_state"]["charger_voltage"]
   target_amps = calculate_target_amps(watts_consuming_now, charger_current,
