@@ -1,11 +1,10 @@
 import pyemvue
 from pyemvue.enums import Scale, Unit
 from replit import db
-import json
 
 DB_AUTH_KEY = 'vue_auth'
 
-solar_usage = None
+solar_usage = {}
 
 
 def get_vue_auth():
@@ -28,32 +27,36 @@ def init():
   #print('login complete')
 
 
-def get_solar_usage():
-  return solar_usage
+def get_solar_usage(time_scale):
+  for channelnum, channel in solar_usage[time_scale].channels.items():
+    return channel.usage
+
+
+def usage_timestamp():
+  first_entry = list(solar_usage.values())[0]
+  for channelnum, channel in first_entry.channels.items():
+    return channel.timestamp
 
 
 def print_solar_usage():
-  print('solar usage:')
-  print(solar_usage)
+  print('solar usage: ')
+  for scale in solar_usage.keys():
+    usage = get_solar_usage(scale)
+    print(usage, Unit.KWH.value, scale)
 
 
 def fetch_solar_data():
+  global solar_usage
   devices = vue.get_devices()
   device_gids = []
   for device in devices:
     if not device.device_gid in device_gids:
       device_gids.append(device.device_gid)
 
-  usage = 0
   for scale in Scale:
-    solar_usage = vue.get_device_list_usage(deviceGids=device_gids,
-                                            instant=None,
-                                            scale=scale.value,
-                                            unit=Unit.KWH.value)
-    print_solar_usage()
-    for gid, device in solar_usage.items():
-      for channelnum, channel in device.channels.items():
-        usage = channel.usage
-        print(usage, Unit.KWH.value, scale.value)
-
+    solar_usage[scale.value] = vue.get_device_list_usage(
+      deviceGids=device_gids,
+      instant=None,
+      scale=scale.value,
+      unit=Unit.KWH.value)[device.device_gid]
   return solar_usage

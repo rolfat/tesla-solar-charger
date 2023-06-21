@@ -5,6 +5,8 @@ from replit import db
 
 LAT_LONG_THRESHOLD = .01
 DB_AUTH_KEY = 'tesla_auth'
+MIN_CHARGER_VOLTAGE = 220
+MIN_CHARGER_CURRENT = 0
 
 vehicle_data = {}
 vehicles = []
@@ -29,16 +31,40 @@ def vehicle_longitude(vd=None):
   return vd["drive_state"]["longitude"]
 
 
+def vehicle_is_plugged_in(vd=None):
+  vd = vd or vd_default()
+  return vd["charge_state"]["charge_port_door_open"]
+
+
 def vehicle_is_at_location(query_lat, query_long, vd=None):
   vd = vd or vd_default()
   return (((vehicle_latitude(vd) - query_lat) <= LAT_LONG_THRESHOLD)
           and ((vehicle_longitude(vd) - query_long) <= LAT_LONG_THRESHOLD))
 
 
+def battery_level(vd=None):
+  vd = vd or vd_default()
+  return vd["charge_state"]["battery_level"]
+
+
 def get_vehicles():
   global vehicles
   vehicles = instance.vehicle_list()
   return vehicles
+
+
+def adjust_charger_by(watts):
+  print('adjusting charger by', watts, 'kwh')
+  print_charger_status()
+
+
+def print_charger_status(vd=None):
+  vd = vd or vd_default()
+  charger_current = vd["charge_state"]["charger_actual_current"]
+  charger_voltage = vd["charge_state"]["charger_voltage"]
+  charger_watts = charger_current * charger_voltage
+  print("Currently using %i amps, %i volts, %i watts" %
+        (charger_current, charger_voltage, charger_watts))
 
 
 def get_vehicle_data(vehicle):
@@ -84,3 +110,26 @@ def connect(email_arg):
 def db_init(key):
   if not key in db.keys():
     db[key] = {}
+
+
+# DEAD CODE
+def setcar(vehicle):
+  if 1 > 0:
+    amptarget = math.ceil(freewatts / charger_voltage)
+    amptarget = amptarget * AMP_TARGET_BUDGET
+    amptarget = min(amptarget, MAX_CHARGER_CURRENT)
+    amptarget = max(amptarget, MIN_CHARGER_CURRENT)
+
+    print("Setting charging amps to %i" % (amptarget))
+    vehicle.command('CHARGING_AMPS', charging_amps=amptarget)
+    sparewatts = freewatts - (amptarget * charger_voltage)
+    lastvehiclechange_ts = lastoutts
+    if vd["charge_state"]["charging_state"] != "Charging":
+      print("%s: Start charging" % name)
+      vehicle.command('START_CHARGE')
+  elif vd["charge_state"]["charging_state"] not in ("Stopped", "Complete"):
+    sparewatts = freewatts
+    print("%s: Stop charging" % name)
+    vehicle.command('STOP_CHARGE')
+    set_nonsolar_charge_config(vehicle)
+    lastvehiclechange_ts = lastoutts
