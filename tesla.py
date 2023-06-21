@@ -51,6 +51,11 @@ def battery_level(vd=None):
   return vd["charge_state"]["battery_level"]
 
 
+def charge_limit(vd=None):
+  vd = vd or vd_default()
+  return vd["charge_state"]["charge_limit_soc"]
+
+
 def get_vehicles():
   global vehicles
   vehicles = instance.vehicle_list()
@@ -62,7 +67,24 @@ def get_vehicle():
     return vehicle
 
 
+def charging_beyond_limit():
+  return (battery_level() >= charge_limit())
+
+
+def stop_charging():
+  vd = vd_default()
+
+  print(": Stop charging")
+  if vd["charge_state"]["charging_state"] not in ("Stopped", "Complete"):
+    get_vehicle().command('STOP_CHARGE')
+    set_nonsolar_charge_config()
+
+
 def adjust_charger_by(watts_consuming_now):
+  if (charging_beyond_limit()):
+    stop_charging()
+    return
+
   print('adjusting charger by', watts_consuming_now, 'kwh')
   print_charger_status()
   vd = vd_default()
@@ -74,11 +96,11 @@ def adjust_charger_by(watts_consuming_now):
 
   if (target_amps != charger_current):
     print("Setting charging amps to %i" % (target_amps))
-    # get_vehicle().command('CHARGING_AMPS', charging_amps=target_amps)
+    get_vehicle().command('CHARGING_AMPS', charging_amps=target_amps)
 
   if vd["charge_state"]["charging_state"] != "Charging":
     print("Start charging")
-    # get_vehicle().command('START_CHARGE')
+    get_vehicle().command('START_CHARGE')
 
 
 def calculate_target_amps(watts_consuming_now, charger_current,
@@ -151,11 +173,3 @@ def connect(email_arg):
 def db_init(key):
   if not key in db.keys():
     db[key] = {}
-
-
-# DEAD CODE
-def setcar(vehicle):
-  if vd["charge_state"]["charging_state"] not in ("Stopped", "Complete"):
-    print("%s: Stop charging" % name)
-    vehicle.command('STOP_CHARGE')
-    set_nonsolar_charge_config(vehicle)
