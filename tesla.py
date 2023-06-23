@@ -10,7 +10,6 @@ DB_AUTH_KEY = 'tesla_auth'
 MIN_CHARGER_VOLTAGE = 220
 MIN_CHARGER_CURRENT = 0
 MAX_CHARGER_CURRENT = 40
-AMP_TARGET_BUDGET = 1
 
 vehicle_data = {}
 vehicles = []
@@ -114,19 +113,19 @@ def calculate_target_amps(watts_consuming_now, charger_current,
   print('target_watts', target_watts)
 
   target_amps = math.ceil(target_watts / charger_voltage)
-  target_amps = target_amps * AMP_TARGET_BUDGET
   target_amps = min(target_amps, MAX_CHARGER_CURRENT)
   target_amps = max(target_amps, MIN_CHARGER_CURRENT)
   return target_amps
 
 
 def set_nonsolar_charge_config():
-  for vehicle in vehicles:
-    vehicle.command('CHARGING_AMPS', charging_amps=MAX_CHARGER_CURRENT)
+  stop_charging()
+  get_vehicle().command('CHARGING_AMPS', charging_amps=MAX_CHARGER_CURRENT)
 
 
 def print_charger_status(vd=None):
   vd = vd or vd_default()
+  # print(vd["charge_state"])
   charger_current = vd["charge_state"]["charger_actual_current"]
   charger_voltage = vd["charge_state"]["charger_voltage"]
   charger_watts = charger_current * charger_voltage

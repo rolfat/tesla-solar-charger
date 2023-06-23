@@ -10,6 +10,7 @@ import tesla
 import vue
 import time
 import pytz
+import math
 import os
 from datetime import datetime
 
@@ -25,7 +26,7 @@ timezone = pytz.timezone('US/Pacific')
 last_is_operating = False
 last_is_at_home = False
 
-# CHARGE_LIMIT = 70
+WATTS_IN_KWH = 1000
 
 
 def maybe_adjust_charger(solar_usage):
@@ -33,11 +34,11 @@ def maybe_adjust_charger(solar_usage):
   maybe_set_night_charging_config()
 
   # vue.print_solar_usage()
-  spare_watts = vue.get_solar_usage('1H')
-  # print("Spare Watts:", spare_watts)
-  for vehicle in tesla.vehicles:
-    if should_adjust_charger():
-      tesla.adjust_charger_by(spare_watts)
+  kw_consuming_now = vue.get_solar_usage('1H')
+  # print("kw_consuming_now:", kw_consuming_now)
+  if should_adjust_charger():
+    watts_consuming_now = math.trunc(kw_consuming_now * WATTS_IN_KWH)
+    tesla.adjust_charger_by(watts_consuming_now)
 
 
 def should_adjust_charger():
@@ -48,21 +49,17 @@ def should_adjust_charger():
     print("no new data, not updating charger")
     return False
 
-  if not tesla.vehicle_is_plugged_in():
-    print("%s: Ignoring as not plugged in" % (name))
-    return False
-
   if not tesla.vehicle_is_at_location(home_lat, home_long):
     print("%s: Ignoring as not at home" % (name))
+    return False
+
+  if not tesla.vehicle_is_plugged_in():
+    print("%s: Ignoring as not plugged in" % (name))
     return False
 
   if not (is_within_operating_hours()):
     print("%s: Ignoring as outside operating hours" % (name))
     return False
-
-  # if (tesla.battery_level() >= CHARGE_LIMIT):
-  #   print("%s: battery at desired charge level" % (name))
-  #   return False
 
   return True
 
@@ -86,14 +83,8 @@ def time_to_string(timestamp):
 def maybe_set_night_charging_config():
   is_at_home = tesla.vehicle_is_at_location(home_lat, home_long)
 
-  just_arrived_home = False
-  if (is_at_home and not last_is_at_home):
-    just_arrived_home = True
-
-  should_set_config = (just_arrived_home and not is_within_operating_hours()
-                       ) or (is_at_home and did_exit_operating_hours())
-
-  if should_set_config:
+  switch_to_nighttime = (is_at_home and did_exit_operating_hours())
+  if switch_to_nighttime:
     print('setting nighttime config')
     tesla.set_nonsolar_charge_config()
 
@@ -104,7 +95,7 @@ def did_exit_operating_hours():
 
 def is_within_operating_hours():
   OPERATING_HOURS_START = 7
-  OPERATING_HOURS_END = 18
+  OPERATING_HOURS_END = 16
   operating_hours = range(OPERATING_HOURS_START, OPERATING_HOURS_END)
 
   current_time = datetime.fromtimestamp(time.time(), timezone)
@@ -121,8 +112,7 @@ vue.init()
 while True:
   QUERY_FREQUENCY_SECONDS = 60 * 15
   try:
-    starttime = time.time()
-    print("\nBegin: %s" % time_to_string(starttime))
+    print("\nBegin: %s" % time_to_string(time.time()))
     solar_usage = vue.fetch_solar_data()
     tesla.fetch_vehicle_data(tesla_email)
 
