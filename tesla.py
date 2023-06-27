@@ -85,10 +85,10 @@ def stop_charging():
 def adjust_charger_by(watts_consuming_now):
   if (charging_beyond_limit()):
     stop_charging()
-    print("all charged up")
+    print("all charged up at %s%%" % battery_level())
     return
 
-  print('adjusting charger by', watts_consuming_now, 'kwh')
+  print('adjusting charger by', watts_consuming_now, 'watts')
   print_charger_status()
 
   vd = vd_default()
@@ -112,6 +112,7 @@ def calculate_target_amps(watts_consuming_now, charger_current,
   target_watts = charger_watts - watts_consuming_now
   print('target_watts', target_watts)
 
+  charger_voltage = max(MIN_CHARGER_VOLTAGE, charger_voltage)
   target_amps = math.ceil(target_watts / charger_voltage)
   target_amps = min(target_amps, MAX_CHARGER_CURRENT)
   target_amps = max(target_amps, MIN_CHARGER_CURRENT)
