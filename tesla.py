@@ -88,7 +88,7 @@ def adjust_charger_by(watts_consuming_now):
     print("all charged up at %s%%" % battery_level())
     return
 
-  print('adjusting charger by', watts_consuming_now, 'watts')
+  print('adjusting charger by', -watts_consuming_now, 'watts')
   print_charger_status()
 
   vd = vd_default()

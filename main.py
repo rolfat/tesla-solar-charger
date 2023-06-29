@@ -14,13 +14,10 @@ import math
 import os
 from datetime import datetime
 
+# https://enlighten.enphaseenergy.com/web/2195730/history/graph/hours
 home_lat = float(os.getenv("homelat"))
 home_long = float(os.getenv("homelong"))
 tesla_email = os.getenv("teslaemail")
-api_key = os.getenv("apikey")
-user_id = os.getenv("userid")
-system_id = os.getenv("systemid")
-auth = "key=%s&user_id=%s" % (api_key, user_id)
 timezone = pytz.timezone('US/Pacific')
 
 last_is_operating = False
@@ -33,9 +30,10 @@ def maybe_adjust_charger(solar_usage):
 
   maybe_set_night_charging_config()
 
-  vue.print_solar_usage()
   kw_consuming_now = vue.get_solar_usage('15MIN') * 4
   print("kw_consuming_now:", kw_consuming_now)
+  # print("battery: %i %%" % tesla.battery_level())
+  # vue.print_solar_usage()
   if should_adjust_charger():
     watts_consuming_now = math.trunc(kw_consuming_now * WATTS_IN_KWH)
     tesla.adjust_charger_by(watts_consuming_now)
