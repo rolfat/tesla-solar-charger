@@ -13,6 +13,7 @@ Edit the environment variables to put in your tesla account email address, home 
 - Stops charging after operating hours
 
 # Feature requests
+- deploy on cloud (fly.io, lambda)
 - use scheduler instead of `sleep()`
 - support multiple vehicles, solar devices, and users
 - frontend to configure settings (lat/long, op hours, max amps, auto-shutoff, etc)
